@@ -1,0 +1,134 @@
+---
+title: "CS555 - Project"
+output: html_notebook
+---
+
+This is my CS555 Project on Hosuing Project
+
+1. longitude: A measure of how far west a house is; a higher value is farther west
+
+2. latitude: A measure of how far north a house is; a higher value is farther north
+
+3. housingMedianAge: Median age of a house within a block; a lower number is a newer building
+
+4. totalRooms: Total number of rooms within a block
+
+5. totalBedrooms: Total number of bedrooms within a block
+
+6. population: Total number of people residing within a block
+
+7. households: Total number of households, a group of people residing within a home unit, for a block
+
+8. medianIncome: Median income for households within a block of houses (measured in tens of thousands of US Dollars)
+
+9. medianHouseValue: Median house value for households within a block (measured in US Dollars)
+
+10. oceanProximity: Location of the house w.r.t ocean/sea
+
+```{r}
+# This code will be different for your directory
+getwd()
+setwd("/Users/ethango/Desktop/CS555/CS555-project")
+library(tidyverse)
+
+data <- read.csv('housing.csv')
+
+```
+
+After reading the data, I will do some basic pre-processing. This step is necessary to clean up the data since our dataset is large. We will reduce the dataset to no more than 2000 observations. Upon closer inspection, the dataset contains 20,640 rows. This is seen below on the Rows. 
+
+```{r}
+glimpse(housing_data)
+```
+
+One of the ways we can reduce the dataset is through random sampling. This is basically choosing random samples without replacement from the dataset. Before doing that, we can start by seeing whether there are missing values in our datasets.
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(visdat)
+summary(data)
+vis_dat(data)
+```
+
+We can see that there are 207 missing values in the total_bedrooms variables. We can also see, through the visualization, that most of the data is complete except those 207 rows of bedrooms. It's worth noting that we can't completely remove them as they might hold some insights (If all the total_bedrooms are of a certain building type than maybe we can't remove them). So now, we will look and delve deeper at those missing values. 
+
+```{r}
+missing_val <- data[is.na(data$total_bedrooms),]
+missing_val
+```
+
+Here we have carefully selected the data where the total bedrooms have missing values. 
+
+```{r}
+ggplot(data = missing_val, aes(x = ocean_proximity, fill = ocean_proximity)) + geom_bar() +xlab('Ocean Proximity') + ylab('Count') + ggtitle('Distribution of Ocean Proximity in the Missing Data')
+```
+
+Comparing the Ocean Proximity distribution with the full dataset.
+
+```{r}
+ggplot(data = data, aes(x = ocean_proximity, fill = ocean_proximity)) + geom_bar() +xlab('Ocean Proximity') + ylab('Count') + ggtitle('Distribution of Ocean Proximity')
+```
+
+It doesn't seem like there is an indication that the missing data is biased towards our variable of interest, ocean_proximity, and because of that we are going to remove all the missing data and proceed with the random sampling. 
+
+```{r}
+non_missing_val <- data[! is.na(data$total_bedrooms),]
+non_missing_val
+```
+
+Simple Random Sampling without replacement
+
+```{r}
+library(sampling)
+set.seed(42)
+sample <- srswor(2000, dim(non_missing_val)[1])
+rows <- (1:nrow(non_missing_val))[sample!=0]
+rows <- rep(rows, sample[sample != 0])
+sample.data <- non_missing_val[rows, ]
+sample.data
+```
+
+Here, we managed to obtains 2000 random sample without replacement using the sampling library and we know that there are no missing data in our graph. We can start visualizing different components of our graph. 
+
+```{r}
+ggplot(data = sample.data, aes(x = ocean_proximity, fill = ocean_proximity)) + geom_bar() +xlab('Ocean Proximity') + ylab('Count') + ggtitle('Distribution of Ocean Proximity')
+```
+
+```{r}
+num_data = sample.data[,3:9]
+num_data
+corr_mat <- cor(num_data)
+round(corr_mat,2)
+```
+
+Here, we also attempt to use the corrplot to show the correlation matrix. 
+
+```{r}
+library(corrplot)
+corrplot(corr_mat, type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+We now have an idea on how some of the data may or may not be correlated. My focus on this project is to perform linear regression and ANOVA on the ocean_proximity variable. 
+
+ANOVA on the ocean_proximity and it's median_house_value
+
+```{r}
+is.factor(sample.data$ocean_proximity)
+sample.data$focean_proximity = factor(sample.data$ocean_proximity)
+m1<- aov(median_house_value~focean_proximity,data=sample.data)
+summary(m1)
+```
+
+From our basic ANOVA analysis between ocean_proximity and median_house_value, we can see from the F value that we would reject the null hypothesis that all the different ocean_proximity have the same mean median_house_value. 
+
+Further analysis should be performed. Another possible way to analyze the data is an ANCOVA analysis controlling with total_rooms
+
+```{r}
+library(car)
+Anova(lm(median_house_value~focean_proximity+total_bedrooms,data=sample.data), type=3)
+
+```
+
+
